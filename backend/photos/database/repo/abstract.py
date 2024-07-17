@@ -1,5 +1,5 @@
 
-from typing import Generic, TypeVar, Any
+from typing import Generic, TypeVar
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -7,13 +7,13 @@ from fastapi import HTTPException
 
 from fastapi_async_sqlalchemy import db
 from sqlalchemy import ScalarResult, exc
-from sqlmodel import select, SQLModel
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette import status
 
 from ..models.base import ModelBase
 
-AbstractModel = TypeVar('AbstractModel', bound=SQLModel)
+AbstractModel = TypeVar('AbstractModel', bound=ModelBase)
 
 
 class Repository(Generic[AbstractModel]):
@@ -31,24 +31,24 @@ class Repository(Generic[AbstractModel]):
         response = await db_session.execute(query)
         return response.scalars()
 
-    async def get_multi_paginated(self, *, session: AsyncSession | None = None, offset: int = 0, limit: int = 0) -> ScalarResult[ModelBase]:
+    async def get_multi_paginated(self, *, session: AsyncSession | None = None, offset: int = 0, limit: int = 0, whereclause: bool = True) -> ScalarResult[ModelBase]:
         db_session = session or self.db.session
-        query = select(self.model).offset(offset).limit(limit)
+        query = select(self.model).where(whereclause).offset(offset).limit(limit)
         response = await db_session.execute(query)
         return response.scalars()
 
-    async def get_by_id(self, id: UUID, *, session: AsyncSession | None = None) -> ModelBase | None:
+    async def get_by_id(self, id: UUID, *, session: AsyncSession | None = None, whereclause: bool = True) -> ModelBase | None:
         db_session = session or self.db.session
-        query = select(self.model).where(self.model.id == id)
+        query = select(self.model).where(self.model.id == id, whereclause)
         response = await db_session.execute(query)
         result = response.scalar_one_or_none()
         if result is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Id not found")
         return result
 
-    async def delete(self, id: UUID, *, session: AsyncSession) -> None:
+    async def delete(self, id: UUID, *, session: AsyncSession, whereclause: bool = True) -> None:
         db_session: AsyncSession = session or self.db.session
-        obj = await self.get_by_id(id=id, session=session)
+        obj = await self.get_by_id(id=id, session=session, whereclause=whereclause)
         if not obj:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ID not found")
         await db_session.delete(obj)
@@ -70,10 +70,10 @@ class Repository(Generic[AbstractModel]):
         await db_session.refresh(obj)
         return obj
 
-    async def update(self, id: UUID, obj_in: AbstractModel, session: AsyncSession) -> ModelBase | None:
+    async def update(self, obj_in: AbstractModel, session: AsyncSession, whereclause: bool = True) -> ModelBase | None:
         db_session: AsyncSession = session or self.db.session
         obj = self.model.model_validate(obj_in)  # type: ignore
-        obj = await self.get_by_id(id, session=session)
+        obj = await self.get_by_id(obj_in.id, session=session, whereclause=whereclause)
         if not obj:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Object not found")
 
@@ -83,65 +83,4 @@ class Repository(Generic[AbstractModel]):
         await db_session.commit()
         await db_session.refresh(obj)
         return obj
-
-
-    # async def update(self, ident: int, **values):
-    #     if isinstance(obj_new, dict):
-    #         update_data = obj_new
-    #     else:
-    #         update_data = obj_new.dict(
-    #             exclude_unset=True
-    #         )  # This tells Pydantic to not include the values that were not sent
-    #     for field in update_data:
-    #         setattr(obj_current, field, update_data[field])
-    #
-    #     db_session.add(obj_current)
-    #     await db_session.commit()
-    #     await db_session.refresh(obj_current)
-    #     return obj_current
-
-    # async def create(
-    #     self,
-    #     *,
-    #     obj_in: BaseModel,
-    #     created_by_id: UUID | str | None = None,
-    #     db_session: AsyncSession | None = None,
-    # ) -> BaseModel:
-    #     db_session = db_session or self.db.session
-    #     db_obj = self.model.model_validate(obj_in)  # type: ignore
-    #
-    #     if created_by_id:
-    #         db_obj.created_by_id = created_by_id
-    #
-    #     try:
-    #         db_session.add(db_obj)
-    #         await db_session.commit()
-    #     except exc.IntegrityError:
-    #         await db_session.rollback()
-    #         raise HTTPException(
-    #             status_code=409,
-    #             detail="Resource already exists",
-    #         )
-    #     await db_session.refresh(db_obj)
-    #     return db_obj
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
