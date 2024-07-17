@@ -20,16 +20,20 @@ class MinioClient:
             self.client.make_bucket(self.bucket_name)
         return self.bucket_name
 
-    def upload_image(self, file: UploadFile):
+    def upload_image(self, file: UploadFile) -> str:
         file_s3_name = self.get_unique_file_name(file)
         file_data: bytes = file.file.read()
+        return self.__put_object(file=file_data, filename=file_s3_name)
+
+    def __put_object(self, file: bytes, filename: str) -> str:
+        content_type = "image/" + filename.split(".")[-1]
         self.client.put_object(
             bucket_name=self.bucket_name,
-            object_name=file_s3_name,
-            data=io.BytesIO(file_data),
-            length=len(file_data),
-            content_type=file.content_type)
-        return self.get_file_url(file_s3_name)
+            object_name=filename,
+            data=io.BytesIO(file),
+            length=len(file),
+            content_type=content_type)
+        return self.get_file_url(filename)
 
     @staticmethod
     def get_unique_file_name(file: UploadFile) -> str:
@@ -40,3 +44,17 @@ class MinioClient:
     def get_file_url(self, file_name: str) -> str:
         file_url = f"{self.endpoint}/{self.bucket_name}/{file_name}"
         return file_url
+
+    def update_image(self, image_url: str, file: UploadFile) -> str:
+        filename = image_url.split("/")[-1]
+        file_data: bytes = file.file.read()
+        return self.__put_object(file=file_data, filename=filename)
+
+    def delete_image(self, image_url: str):
+        object_name = image_url.split("/")[-1]
+        self.client.remove_object(
+            bucket_name=self.bucket_name,
+            object_name=object_name
+        )
+
+
