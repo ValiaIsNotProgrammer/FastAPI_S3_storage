@@ -1,6 +1,14 @@
-from sqlmodel import SQLModel, Field, UUID
+import uuid
+from uuid import UUID
+
+from pydantic import BaseConfig
+from sqlmodel import SQLModel, Field, Relationship
+from typing import TYPE_CHECKING
 
 from .base import ModelBase
+
+if TYPE_CHECKING:
+    from .user import UserModel
 
 
 class PhotoBase(SQLModel):
@@ -10,3 +18,9 @@ class PhotoBase(SQLModel):
 
 class PhotoModel(PhotoBase, ModelBase, table=True):
     __tablename__ = "photos"
+    user_id: UUID = Field(foreign_key="users.id", index=True, default=uuid.uuid4())
+
+    user: 'UserModel' = Relationship(back_populates="photos")
+
+    class Config(BaseConfig):
+        arbitrary_types_allowed = True
