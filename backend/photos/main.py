@@ -1,11 +1,11 @@
 import uvicorn
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
 from core import settings
 from api.api_v1.api import api_router
 
-app = FastAPI(openapi_url=f"/{settings.api.CURRENT_VERSION}/openapi.json")
 
 
 # @app.middleware("http")
@@ -14,6 +14,18 @@ app = FastAPI(openapi_url=f"/{settings.api.CURRENT_VERSION}/openapi.json")
 #         request.state.db = Database(session)
 #         response = await call_next(request)
 #     return response
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("server is starting")
+    yield
+    print("server is stopping")
+
+app = FastAPI(openapi_url=f"/{settings.api.CURRENT_VERSION}/openapi.json",
+              lifespan=lifespan,
+
+              )
 
 
 app.add_middleware(
